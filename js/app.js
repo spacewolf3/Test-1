@@ -10,6 +10,7 @@
   const SECTION_FOR = {
     "Current Events": "News", Trending: "Culture", Science: "Science", Tech: "Technology", History: "History",
     Curiosities: "Features", Ideas: "Ideas", Culture: "Culture", Food: "Features", Places: "Features", Nature: "Science",
+    "Design & Art": "Culture", Surprise: "Features", "Hot Theme": "News",
   };
 
   let wireFilter = "All";
@@ -324,7 +325,7 @@
       const added = Store.addTopics(topics);
       toast(added.length ? `${added.length} new topics on the wire.` : "No new topics right now — try again later.");
       if (failed.length) console.warn("Some sources didn't respond:", failed.join(", "));
-      if (failed.length === 7) toast("Couldn't reach any topic sources. Check your connection.");
+      if (failed.length >= 8) toast("Couldn't reach any topic sources. Check your connection.");
     } catch (e) {
       console.error(e);
       toast("Gathering failed: " + e.message);
@@ -410,7 +411,8 @@
         <div class="r-block original">
           <h4>Where this came from</h4>
           <ul class="links">
-            ${t.sourceUrl ? `<li><a href="${esc(t.sourceUrl)}" target="_blank" rel="noopener">${esc(t.source || t.sourceUrl)}</a></li>` : `<li class="muted">Your own idea.</li>`}
+            ${t.sourceUrl ? `<li><a href="${esc(t.sourceUrl)}" target="_blank" rel="noopener">${esc(t.links ? t.links[0].title : t.source || t.sourceUrl)}</a></li>` : `<li class="muted">Your own idea.</li>`}
+            ${(t.links || []).slice(1).map((l) => `<li><a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.title)}</a></li>`).join("")}
             ${t.discussionUrl ? `<li><a href="${esc(t.discussionUrl)}" target="_blank" rel="noopener">Discussion thread</a></li>` : ""}
           </ul>
         </div>
@@ -634,12 +636,45 @@
           <button class="btn" id="export">Export backup</button>
           <label class="btn">Import backup<input type="file" id="import" accept="application/json,.json" hidden></label>
         </div>
+        <h3>Sources</h3>
+        <p class="muted">Magazines give you one article idea each per gather. News outlets are only scanned for <strong>hot themes</strong>: subjects at least three outlets are covering at once.</p>
+        <div class="row"><button class="btn" id="test-feeds">Check which sources are working</button></div>
+        <div id="feed-list"></div>
+        <form class="add-feed" id="add-feed">
+          <label>Name<input name="name" required placeholder="e.g. Hakai Magazine"></label>
+          <label>RSS feed URL<input name="url" type="url" required placeholder="https://…/feed/"></label>
+          <label>Use as<select name="role"><option value="ideas">Article ideas</option><option value="news">News (for hot themes)</option></select></label>
+          <button class="btn">Add source</button>
+        </form>
         <h3>Topic wire</h3>
         <div class="row">
           <button class="btn" id="clear-wire">Clear all undesked topics</button>
           <button class="btn" id="forget">Forget dismissed topics</button>
         </div>
       </div>`;
+    renderFeedList();
+    $("#add-feed").onsubmit = (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const role = fd.get("role");
+      Store.addFeed({ name: fd.get("name").trim(), url: fd.get("url").trim(), role, category: role === "news" ? "News" : "Surprise", custom: true });
+      e.target.reset();
+      renderFeedList();
+      toast("Source added.");
+    };
+    $("#test-feeds").onclick = async (e) => {
+      e.target.disabled = true;
+      e.target.textContent = "Checking…";
+      await Promise.all($$(".feed-row").map(async (row) => {
+        const st = $(".status", row);
+        st.className = "status";
+        st.textContent = "checking…";
+        try { const n = await Feeds.testFeed(row.dataset.url); st.textContent = `✓ ${n} articles`; st.classList.add("ok"); }
+        catch (err) { st.textContent = "✕ not reachable"; st.classList.add("bad"); }
+      }));
+      e.target.disabled = false;
+      e.target.textContent = "Check which sources are working";
+    };
     $("#settings-form").onsubmit = (e) => {
       e.preventDefault();
       const fd = new FormData(e.target);
@@ -670,6 +705,26 @@
       Store.save();
       toast("Dismissed topics may show up again in future gathers.");
     };
+  }
+
+  function renderFeedList() {
+    const disabled = new Set(Store.state.feedPrefs.disabled);
+    const all = [...window.DEFAULT_FEEDS, ...Store.state.feedPrefs.custom];
+    const groups = { "Article ideas": all.filter((f) => f.role === "ideas"), "News outlets (hot themes)": all.filter((f) => f.role === "news") };
+    $("#feed-list").innerHTML = Object.entries(groups).map(([label, list]) => `
+      <div class="feed-group"><h4>${esc(label)}</h4>
+        ${list.map((f) => `
+          <div class="feed-row" data-url="${esc(f.url)}">
+            <label><input type="checkbox" ${disabled.has(f.url) ? "" : "checked"}> ${esc(f.name)}</label>
+            <span class="status"></span>
+            ${f.custom ? `<button class="linklike" data-remove>remove</button>` : ""}
+          </div>`).join("")}
+      </div>`).join("");
+    $$(".feed-row").forEach((row) => {
+      $("input", row).onchange = (e) => Store.toggleFeed(row.dataset.url, e.target.checked);
+      const rm = $("[data-remove]", row);
+      if (rm) rm.onclick = () => { Store.removeFeed(row.dataset.url); renderFeedList(); };
+    });
   }
 
   route();

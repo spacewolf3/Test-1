@@ -13,6 +13,7 @@
     seen: [],     // ids ever added or dismissed, so gathers don't repeat them
     notes: {},    // topicId -> brainstorm text
     drafts: {},   // topicId -> unpublished article form contents
+    feedPrefs: { disabled: [], custom: [] }, // feed URLs turned off, and feeds you added
     articles: [], // {id, topicId, headline, dek, byline, section, date, imageUrl, imageCaption, body, sources, publishedAt, updatedAt}
   });
 
@@ -118,6 +119,14 @@
 
     // ---- settings / backup ----
     updateSettings(s) { Object.assign(state.settings, s); save(); },
+    toggleFeed(url, on) {
+      const d = new Set(state.feedPrefs.disabled);
+      on ? d.delete(url) : d.add(url);
+      state.feedPrefs.disabled = [...d];
+      save();
+    },
+    addFeed(feed) { state.feedPrefs.custom.push(feed); save(); },
+    removeFeed(url) { state.feedPrefs.custom = state.feedPrefs.custom.filter((f) => f.url !== url); save(); },
     exportJSON() { return JSON.stringify(state, null, 2); },
     importJSON(text) {
       const parsed = JSON.parse(text);

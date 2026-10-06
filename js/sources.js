@@ -245,29 +245,37 @@
 
   // How many fresh topics each source contributes per gather.
   const QUOTAS = [
-    { name: "Current events", fn: currentEvents, take: 6 },
-    { name: "In the news & trending", fn: () => featuredFeed(), take: 6 },
-    { name: "New studies", fn: newStudies, take: 4 },
-    { name: "On this day", fn: onThisDay, take: 3 },
-    { name: "Tech", fn: techNews, take: 3 },
-    { name: "Deep cuts", fn: deepCuts, take: 2 },
-    { name: "Feature ideas", fn: async () => evergreen(), take: 4 },
+    { name: "Current events", fn: currentEvents, take: 4 },
+    { name: "In the news & trending", fn: () => featuredFeed(), take: 4 },
+    { name: "New studies", fn: newStudies, take: 3 },
+    { name: "On this day", fn: onThisDay, take: 2 },
+    { name: "Tech", fn: techNews, take: 2 },
+    { name: "Deep cuts", fn: deepCuts, take: 1 },
+    { name: "Feature ideas", fn: async () => evergreen(), take: 2 },
   ];
+  const MAX_FEED_IDEAS = 10; // at most one per magazine per gather
+  const MAX_THEMES = 4;
 
   /** Gather a fresh mix of topics, skipping anything already seen or dismissed. */
   async function gather(seenIds) {
     const seen = new Set(seenIds);
-    const results = await Promise.allSettled(QUOTAS.map((q) => q.fn()));
+    const tasks = QUOTAS.map((q) => q.fn());
+    // Wikipedia's news summaries and Hacker News also count toward "hot theme" detection.
+    const headlineOf = (src) => (r) => r.status === "fulfilled" ? r.value.map((t) => ({ title: t.title, link: t.sourceUrl, source: src })) : [];
+    const extraHeadlines = Promise.all([
+      Promise.allSettled([tasks[0]]).then(([r]) => headlineOf("Wikipedia Current Events")(r)),
+      Promise.allSettled([tasks[4]]).then(([r]) => headlineOf("Hacker News")(r)),
+    ]).then((a) => a.flat());
+    const feedsTask = window.Feeds ? Feeds.gatherFeeds(extraHeadlines) : Promise.reject(new Error("feeds unavailable"));
+    const [results, feedResult] = await Promise.all([Promise.allSettled(tasks), Promise.allSettled([feedsTask]).then(([r]) => r)]);
+
     const picked = [];
     const failed = [];
-    results.forEach((r, i) => {
-      if (r.status !== "fulfilled") { failed.push(QUOTAS[i].name); console.warn(QUOTAS[i].name, r.reason); return; }
-      const fresh = r.value.filter((t) => !seen.has(t.id));
-      // News items keep their order (most important first); everything else is sampled.
-      const pool = /Current|news/.test(QUOTAS[i].name) ? fresh : shuffle(fresh);
+    const take = (pool, n) => {
       let taken = 0;
       for (const t of pool) {
-        if (taken >= QUOTAS[i].take) break;
+        if (taken >= n) break;
+        if (seen.has(t.id)) continue;
         const key = t.wikiTitle && "w:" + t.wikiTitle.toLowerCase();
         if (key && seen.has(key)) continue; // same subject already picked from another source
         seen.add(t.id);
@@ -275,6 +283,24 @@
         picked.push(t);
         taken++;
       }
+    };
+
+    if (feedResult.status === "fulfilled") {
+      const { ideas, themes } = feedResult.value;
+      take(themes, MAX_THEMES);
+      // One article per magazine, magazines in random order.
+      const byFeed = {};
+      for (const t of shuffle(ideas)) if (!seen.has(t.id)) byFeed[t.feedName] = byFeed[t.feedName] || t;
+      take(shuffle(Object.values(byFeed)), MAX_FEED_IDEAS);
+      if (feedResult.value.failed.length) console.warn("Feeds that didn't respond:", feedResult.value.failed.join(", "));
+    } else {
+      failed.push("Magazine & news feeds");
+    }
+
+    results.forEach((r, i) => {
+      if (r.status !== "fulfilled") { failed.push(QUOTAS[i].name); console.warn(QUOTAS[i].name, r.reason); return; }
+      // News items keep their order (most important first); everything else is sampled.
+      take(/Current|news/.test(QUOTAS[i].name) ? r.value : shuffle(r.value), QUOTAS[i].take);
     });
     return { topics: shuffle(picked), failed };
   }
@@ -368,6 +394,10 @@
       Trending: ["Why are so many people looking this up right now?", "What's the story behind the headlines?"],
       Science: ["What question were the researchers asking?", "How big was the study, and what are its limits?", "What would this change in everyday life?", "What do independent experts say?"],
       Tech: ["Who wins and who loses if this takes off?", "Explain it to someone who doesn't follow tech."],
+      "Hot Theme": ["Why are so many outlets covering this at once?", "What's the story underneath the headlines?", "What are the different outlets emphasizing, and what are they missing?"],
+      Ideas: ["What's the big idea, in your own words?", "Do you agree? What's the strongest counterargument?", "Where does this idea show up in everyday life?"],
+      "Design & Art": ["Who made this, and what were they trying to do?", "Describe it so a reader can picture it without seeing it.", "What's the trend or movement it belongs to?"],
+      Surprise: ["What made you curious about this?", "What's the strangest detail you found?", "Who would be most surprised to learn this?"],
       History: ["Why does this still matter today?", "What's the human story — one person at the center of it?", "What do most people get wrong about it?"],
     };
     return [...(byCat[topic.category] || ["What's the hook that makes a reader care today?", "What's a vivid scene you could open with?"]), ...common];
