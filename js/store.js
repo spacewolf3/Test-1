@@ -14,6 +14,7 @@
     notes: {},    // topicId -> brainstorm text
     drafts: {},   // topicId -> unpublished article form contents
     feedPrefs: { disabled: [], custom: [] }, // feed URLs turned off, and feeds you added
+    books: [],    // {id, title, author, year, pages, cover, olUrl, kind, status, dateFinished, rating, answers, reviewId}
     articles: [], // {id, topicId, headline, dek, byline, section, date, imageUrl, imageCaption, body, sources, publishedAt, updatedAt}
   });
 
@@ -88,6 +89,24 @@
     setNotes(id, text) { state.notes[id] = text; save(); },
     setDraft(id, draft) { state.drafts[id] = draft; save(); },
 
+    // ---- books ----
+    book(id) { return state.books.find((b) => b.id === id); },
+    addBook(book) {
+      const id = uid();
+      state.books.push({ ...book, id, addedAt: Date.now() });
+      save();
+      return id;
+    },
+    updateBook(id, patch) {
+      const b = Store.book(id);
+      if (b) { Object.assign(b, patch); save(); }
+    },
+    deleteBook(id) {
+      state.books = state.books.filter((b) => b.id !== id);
+      delete state.drafts["book:" + id];
+      save();
+    },
+
     // ---- articles ----
     article(id) { return state.articles.find((a) => a.id === id); },
     publish(article) {
@@ -98,6 +117,11 @@
         article.id = uid();
         article.publishedAt = Date.now();
         state.articles.push(article);
+        if (article.bookId) {
+          const b = Store.book(article.bookId);
+          if (b) b.reviewId = article.id;
+          delete state.drafts["book:" + article.bookId];
+        }
         if (article.topicId) {
           state.topics = state.topics.filter((t) => t.id !== article.topicId);
           delete state.drafts[article.topicId];
@@ -107,6 +131,7 @@
       return article.id;
     },
     deleteArticle(id) {
+      state.books.forEach((b) => { if (b.reviewId === id) delete b.reviewId; });
       state.articles = state.articles.filter((a) => a.id !== id);
       save();
     },

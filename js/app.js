@@ -6,7 +6,7 @@
   const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
   const app = $("#app");
 
-  const SECTIONS = ["News", "World", "Politics", "Science", "Health", "Technology", "History", "Culture", "Ideas", "Features", "Opinion"];
+  const SECTIONS = ["News", "World", "Politics", "Science", "Health", "Technology", "History", "Culture", "Ideas", "Books", "Features", "Opinion"];
   const SECTION_FOR = {
     "Current Events": "News", Trending: "Culture", Science: "Science", Tech: "Technology", History: "History",
     Curiosities: "Features", Ideas: "Ideas", Culture: "Culture", Food: "Features", Places: "Features", Nature: "Science",
@@ -21,7 +21,8 @@
     const parts = location.hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent);
     const [view, a, b] = parts;
     if (!view) return location.replace(Store.state.articles.length ? "#/paper" : "#/newsroom");
-    document.body.dataset.view = view === "newsroom" || view === "write" || view === "edit" ? "newsroom" : view || "paper";
+    document.body.dataset.view = view === "write" && a === "book" ? "books"
+      : view === "newsroom" || view === "write" || view === "edit" ? "newsroom" : view || "paper";
     $$(".topnav a").forEach((el) => el.classList.toggle("active", el.dataset.view === document.body.dataset.view));
     window.scrollTo(0, 0);
 
@@ -30,6 +31,8 @@
     if (view === "paper" && a === "archive") return renderArchive();
     if (view === "paper") return renderPaper();
     if (view === "newsroom") return renderNewsroom(a);
+    if (view === "books") return a ? Books.renderBook(app, a) : Books.renderShelf(app);
+    if (view === "write" && a === "book") return renderWrite({ bookId: b });
     if (view === "write") return renderWrite({ topicId: a === "new" ? null : a });
     if (view === "edit") return renderWrite({ articleId: a });
     if (view === "settings") return renderSettings();
@@ -91,11 +94,12 @@
     return `
       <article class="story story-${size}">
         ${size !== "small" ? `<a href="${href}" class="story-img">${figure(a)}</a>` : ""}
-        <div class="kicker">${esc(a.section)}</div>
+        ${a.book && !a.imageUrl && size !== "small" ? `<a href="${href}">${Books.coverHTML(a.book, "story-cover")}</a>` : ""}
+        <div class="kicker">${esc(a.section)}${a.book && a.book.rating ? ` <span class="stars">${Books.stars(a.book.rating)}</span>` : ""}</div>
         <h2 class="headline"><a href="${href}">${esc(a.headline)}</a></h2>
         ${a.dek && size !== "small" ? `<p class="dek">${esc(a.dek)}</p>` : ""}
         <div class="byline">${byline(a)}</div>
-        ${size !== "small" ? `<div class="teaser">${teaser}</div>` : ""}
+        ${size !== "small" ? `<div class="teaser${size === "lead" && !a.book && teaser.length > 700 ? " two-col" : ""}">${teaser}</div>` : ""}
         ${size === "lead" ? `<a class="continue" href="${href}">Continue reading →</a>` : ""}
       </article>`;
   }
@@ -136,11 +140,26 @@
         ${briefs.length ? `
           <h3 class="rule-heading">More Stories</h3>
           <div class="briefs">${briefs.map((a) => storyCard(a, "small")).join("")}</div>` : ""}
+        ${!section ? bookStrip() : ""}
         ${more.length ? `
           <h3 class="rule-heading">From the Archive</h3>
           <ul class="archive-list">${more.map(archiveItem).join("")}</ul>` : ""}`}
         ${footer()}
       </div>`;
+  }
+
+  function bookStrip() {
+    const reviews = Store.sortedArticles().filter((a) => a.book).slice(0, 6);
+    if (!reviews.length) return "";
+    return `
+      <h3 class="rule-heading">From the Bookshelf <a class="muted" href="#/paper/section/Books">All reviews →</a></h3>
+      <div class="book-strip">${reviews.map((a) => `
+        <a href="#/paper/article/${a.id}" class="bs-item">
+          ${Books.coverHTML(a.book, "cover")}
+          <div class="bs-title">${esc(a.book.title)}</div>
+          <div class="bs-author">${esc(a.book.author || "")}</div>
+          ${a.book.rating ? `<div class="stars">${Books.stars(a.book.rating)}</div>` : ""}
+        </a>`).join("")}</div>`;
   }
 
   const archiveItem = (a) => `
@@ -181,6 +200,7 @@
           ${a.dek ? `<p class="article-dek">${esc(a.dek)}</p>` : ""}
           <div class="byline article-byline">${byline(a)}${a.updatedAt ? ` · <span class="muted">Updated ${esc(new Date(a.updatedAt).toLocaleDateString())}</span>` : ""}</div>
           ${figure(a, "article-figure")}
+          ${a.book ? bookBox(a.book) : ""}
           <div class="article-body">${articleHTML(a.body)}</div>
           ${a.sources && a.sources.length ? `
             <aside class="further-reading">
@@ -206,6 +226,20 @@
       toast("Article deleted.");
       go("#/paper");
     };
+  }
+
+  function bookBox(b) {
+    return `
+      <aside class="book-box">
+        ${Books.coverHTML(b, "cover")}
+        <div>
+          <div class="bb-label">The book</div>
+          <div class="bb-title">${esc(b.title)}</div>
+          <div>${esc(b.author || "")}</div>
+          <div class="muted">${esc([b.year, b.pages && `${b.pages} pages`].filter(Boolean).join(" · "))}</div>
+          ${b.rating ? `<div class="stars big-stars" title="${b.rating} out of 5">${Books.stars(b.rating)}</div>` : ""}
+        </div>
+      </aside>`;
   }
 
   function footer() {
@@ -483,7 +517,11 @@
   }
 
   // ---------------------------------------------------------------- write / edit
-  function renderWrite({ topicId, articleId }) {
+  function renderWrite({ topicId, articleId, bookId }) {
+    const book = bookId ? Store.book(bookId) : null;
+    if (bookId && !book) return go("#/books");
+    // Rebuilding a review that's already published edits that article rather than adding a second one.
+    if (book && book.reviewId && Store.article(book.reviewId)) articleId = book.reviewId;
     const editing = articleId ? Store.article(articleId) : null;
     if (articleId && !editing) return go("#/paper");
     const topic = topicId ? Store.topic(topicId) : null;
@@ -498,8 +536,10 @@
       if (research) [...research.coverage.slice(0, 4), ...research.studies.slice(0, 3)].forEach((x) => suggestedSources.push({ title: x.title, url: x.url }));
     }
 
-    const draft = (topicId && Store.state.drafts[topicId]) || {};
-    const v = editing || {
+    const draftKey = topicId || (book && "book:" + book.id);
+    const draft = (draftKey && !editing && Store.state.drafts[draftKey]) || {};
+    const fromNotes = book ? Books.buildDraft(book) : {};
+    const v = editing ? { ...editing, ...fromNotes, byline: editing.byline, date: editing.date } : {
       headline: topic ? topic.title.replace(/ — .*$/, "") : "",
       dek: "",
       byline: s.author,
@@ -509,6 +549,8 @@
       imageCaption: "",
       body: "",
       sources: [],
+      ...fromNotes,
+      ...(book ? { date: book.dateFinished || Store.today() } : {}),
       ...draft,
     };
     const seenSrc = new Set();
@@ -518,7 +560,7 @@
       else { seenSrc.add(k); seenSrc.add(suggestedSources[i].url); }
     }
     // New articles start with every suggested source ticked; edits keep what was saved.
-    if (!editing && !draft.sources) v.sources = suggestedSources;
+    if (!editing && !draft.sources && !book) v.sources = suggestedSources;
     const chosen = new Set((v.sources || []).map((x) => x.url));
     const allSources = [...(v.sources || []), ...suggestedSources.filter((x) => !chosen.has(x.url))];
     const sectionOpts = SECTIONS.includes(v.section) ? SECTIONS : [...SECTIONS, v.section];
@@ -526,9 +568,11 @@
     app.innerHTML = `
       <div class="write">
         <div class="write-head">
-          <a class="back" href="${editing ? `#/paper/article/${editing.id}` : topic ? `#/newsroom/${encodeURIComponent(topic.id)}` : "#/newsroom"}">← Back</a>
-          <h2>${editing ? "Edit article" : "Submit your article"}</h2>
+          <a class="back" href="${book ? `#/books/${book.id}` : editing ? `#/paper/article/${editing.id}` : topic ? `#/newsroom/${encodeURIComponent(topic.id)}` : "#/newsroom"}">← Back</a>
+          <h2>${book ? (editing ? "Update your review" : "Your review") : editing ? "Edit article" : "Submit your article"}</h2>
           ${topic ? `<p class="muted">Topic: ${esc(topic.title)}</p>` : ""}
+          ${book ? `<p class="muted">Built from your notes on <em>${esc(book.title)}</em>. Polish it here: reorder, add transitions, cut what doesn't fit. Then publish.</p>` : ""}
+          ${book && editing ? `<p class="warn">This draft was rebuilt from your notes. Saving replaces the text of your published review. Go back to keep the published version as it is.</p>` : ""}
         </div>
         <form id="article-form" class="article-form">
           <div class="form-main">
@@ -590,7 +634,7 @@
       if (e.target.name === "imageUrl") {
         $(".img-preview").innerHTML = e.target.value.trim() ? `<img src="${esc(e.target.value.trim())}" alt="" onerror="this.remove()">` : "";
       }
-      if (!editing && topicId) { clearTimeout(t); t = setTimeout(() => Store.setDraft(topicId, read()), 400); }
+      if (!editing && draftKey) { clearTimeout(t); t = setTimeout(() => Store.setDraft(draftKey, read()), 400); }
     };
     $("#preview-btn").onclick = () => {
       const a = read();
@@ -603,6 +647,7 @@
           ${a.dek ? `<p class="article-dek">${esc(a.dek)}</p>` : ""}
           <div class="byline article-byline">${byline(a)}</div>
           ${figure(a, "article-figure")}
+          ${book ? bookBox(Books.bookInfo(book)) : ""}
           <div class="article-body">${articleHTML(a.body)}</div>
         </article>`;
       p.scrollIntoView({ behavior: "smooth" });
@@ -612,7 +657,9 @@
       const a = read();
       if (!a.body.trim()) return toast("Paste in your article text first.");
       if (a.byline && !s.author) Store.updateSettings({ author: a.byline });
-      const id = Store.publish(editing ? { ...a, id: editing.id } : { ...a, topicId: topicId || null });
+      const reviewOf = book || (editing && editing.bookId && Store.book(editing.bookId));
+      if (reviewOf) a.book = Books.bookInfo(reviewOf); // keep rating and details in step with the shelf
+      const id = Store.publish(editing ? { ...a, id: editing.id } : { ...a, topicId: topicId || null, bookId: book ? book.id : null });
       toast(editing ? "Changes saved." : "Published! Your story is in the paper.");
       go(`#/paper/article/${id}`);
     };
@@ -706,6 +753,8 @@
       toast("Dismissed topics may show up again in future gathers.");
     };
   }
+
+  window.App = { go, toast };
 
   function renderFeedList() {
     const disabled = new Set(Store.state.feedPrefs.disabled);

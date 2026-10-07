@@ -2,7 +2,7 @@
 
 A one-person newspaper: find topics, research them, write the stories yourself, and watch your front page fill up.
 
-## The two areas
+## The three areas
 
 **✎ Newsroom**
 - **Topic Wire**: a mix of topics from many places.
@@ -24,6 +24,15 @@ A one-person newspaper: find topics, research them, write the stories yourself, 
   - One-click searches on Google News, AP, Reuters, BBC, NPR, Google Scholar, PubMed, Britannica, Internet Archive and more.
   - Brainstorm prompts and a notepad that saves as you type.
 - **Submit article**: paste in the piece you wrote elsewhere. Add a headline, subheadline, byline, section, date and an optional image. Pick which sources to list under it, preview it, then publish.
+
+**📚 Bookshelf**
+- Add the books you've read by searching [Open Library](https://openlibrary.org), a free book catalog, or add them by hand.
+- Track each book's status (finished, reading, want to read), date finished, and a 1–5 star rating.
+- Each book gets a set of review questions. Fiction and nonfiction get different ones (characters and setting vs. argument and evidence). Answers save as you type.
+- **Turn my notes into a review** assembles your answers into a draft, which you polish and publish to the paper's **Books** section.
+  - Your one-sentence verdict becomes the subheadline.
+  - Your favorite quote becomes a pull quote.
+- Published reviews show the book's cover, details and your rating. The front page gets a "From the Bookshelf" row.
 
 **📰 The Paper**
 - Front page:
