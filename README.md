@@ -51,6 +51,13 @@ It's a static site with no build step and no server code.
 - **Locally**: from this folder, run `npx serve .` (or `python3 -m http.server`) and open the URL it prints. Opening `index.html` directly also works in most browsers.
 - **Online**: turn on GitHub Pages for this repository (Settings → Pages → deploy from branch, root folder).
 
+## On your phone's home screen
+Once the app is online at a web address (GitHub Pages or Netlify), open that address on your phone:
+- **iPhone (Safari):** tap Share → **Add to Home Screen** → Add.
+- **Android (Chrome):** tap ⋮ → **Add to Home screen** (or **Install app**).
+
+It opens full-screen with its own icon and works without a connection, though gathering topics and searching books need one. On iPhone, the home-screen app keeps its own saved data, separate from Safari. Use Export/Import backup in Settings if you've already written in Safari.
+
 ## About the feeds
 Most websites don't let a web page read their RSS feed directly. When that happens, the app reads the feed through [rss2json.com](https://rss2json.com), a free service that converts feeds. That service sees which feed addresses are requested, and nothing else.
 

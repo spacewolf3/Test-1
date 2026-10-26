@@ -1,0 +1,19 @@
+{
+  "name": "My Paper",
+  "short_name": "My Paper",
+  "description": "A personal newspaper: find topics, write stories and book reviews, and publish them to your own front page.",
+  "start_url": "./#/paper",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#fbf9f4",
+  "theme_color": "#1a1a1a",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Newsroom", "url": "./#/newsroom", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Bookshelf", "url": "./#/books", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}
