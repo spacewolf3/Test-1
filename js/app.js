@@ -677,8 +677,10 @@
           <label>Default byline<input name="author" value="${esc(s.author)}" placeholder="Your name"></label>
           <button class="btn primary">Save</button>
         </form>
+        <h3>Sync across devices</h3>
+        <div id="sync-panel" class="sync-panel"></div>
         <h3>Backup</h3>
-        <p class="muted">Everything is stored in this browser only. Export a backup now and then — and to move your paper to another device.</p>
+        <p class="muted">${Sync.enabled() ? "Your paper is saved in this browser and synced to your GitHub repo. You can still export a copy as a file." : "Everything is stored in this browser only. Export a backup now and then, or turn on sync above."}</p>
         <div class="row">
           <button class="btn" id="export">Export backup</button>
           <label class="btn">Import backup<input type="file" id="import" accept="application/json,.json" hidden></label>
@@ -700,6 +702,7 @@
         </div>
       </div>`;
     renderFeedList();
+    renderSyncPanel();
     $("#add-feed").onsubmit = (e) => {
       e.preventDefault();
       const fd = new FormData(e.target);
@@ -754,7 +757,91 @@
     };
   }
 
-  window.App = { go, toast };
+  // Redraw the current page, e.g. after sync brought in changes from another device.
+  const refresh = () => { const y = window.scrollY; route(); window.scrollTo(0, y); };
+  window.App = { go, toast, refresh };
+
+  function timeAgo(t) {
+    if (!t) return "never";
+    const s = Math.round((Date.now() - t) / 1000);
+    if (s < 60) return "just now";
+    if (s < 3600) return `${Math.round(s / 60)} min ago`;
+    if (s < 86400) return `${Math.round(s / 3600)} hr ago`;
+    return new Date(t).toLocaleDateString();
+  }
+
+  function renderSyncPanel() {
+    const el = $("#sync-panel");
+    if (!el) return;
+    const c = Sync.config();
+    if (!Sync.enabled()) {
+      el.innerHTML = `
+        <p class="muted">Keep your paper the same on your phone, laptop and anywhere else, by saving it to a <strong>private</strong> GitHub repo. Every save is kept in the repo's history, so you also get automatic backups.</p>
+        <ol class="sync-steps">
+          <li><strong>Create a private repo</strong> for your data (not the app's repo):
+            <a href="https://github.com/new?name=my-paper-data&visibility=private" target="_blank" rel="noopener">github.com/new</a>.
+            Name it <code>my-paper-data</code> and choose <strong>Private</strong>.</li>
+          <li><strong>Create an access token</strong> at
+            <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub → Fine-grained tokens</a>:
+            <ul>
+              <li>Name: <em>My Paper</em>. Expiration: up to a year (you'll paste a new one when it runs out).</li>
+              <li>Repository access: <strong>Only select repositories</strong> → <code>my-paper-data</code>.</li>
+              <li>Permissions → Repository permissions → <strong>Contents: Read and write</strong>.</li>
+              <li>Click <strong>Generate token</strong> and copy it.</li>
+            </ul></li>
+          <li><strong>Paste both below</strong>, on each device you use. The token stays on that device only. It's never synced, exported or sent anywhere except GitHub.</li>
+        </ol>
+        <form id="sync-form" class="sync-form">
+          <label>Repo<input name="repo" placeholder="spacewolf3/my-paper-data" required autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+          <label>Access token<input name="token" type="password" placeholder="github_pat_…" required autocomplete="off"></label>
+          <button class="btn primary">Connect &amp; sync</button>
+        </form>
+        <p class="meta" id="sync-msg"></p>`;
+      $("#sync-form").onsubmit = async (e) => {
+        e.preventDefault();
+        const btn = $("button", e.target);
+        btn.disabled = true;
+        btn.textContent = "Connecting…";
+        $("#sync-msg").textContent = "";
+        try {
+          await Sync.connect(e.target.repo.value, e.target.token.value);
+          toast("Connected. Your paper now syncs across devices.");
+          renderSettings();
+        } catch (err) {
+          Sync.disconnect();
+          $("#sync-msg").innerHTML = `<span class="danger">${esc(err.message)}</span>`;
+          btn.disabled = false;
+          btn.textContent = "Connect & sync";
+        }
+      };
+      return;
+    }
+    const st = Sync.status;
+    const line = st.state === "syncing" ? "Syncing…"
+      : st.state === "error" ? `<span class="danger">Last sync failed: ${esc(st.message)}</span>`
+      : st.state === "pending" ? "Changes will be saved to GitHub in a few seconds."
+      : `Last synced ${timeAgo(c.lastSyncAt)}.`;
+    el.innerHTML = `
+      <div class="sync-on">
+        <div><strong>✓ Syncing with <a href="https://github.com/${esc(c.repo)}" target="_blank" rel="noopener">${esc(c.repo)}</a></strong></div>
+        <div class="meta">${line}</div>
+        <div class="row">
+          <button class="btn" id="sync-now">Sync now</button>
+          <button class="btn ghost" id="sync-off">Disconnect this device</button>
+        </div>
+        <p class="meta">Changes save to GitHub about 15 seconds after you stop editing, and when you close or switch away from the app. Opening the app picks up changes from your other devices.</p>
+      </div>`;
+    $("#sync-now").onclick = async () => {
+      const changed = await Sync.sync();
+      toast(Sync.status.state === "error" ? Sync.status.message : changed ? "Synced. Brought in changes from your other devices." : "Synced. Everything's up to date.");
+      renderSyncPanel();
+    };
+    $("#sync-off").onclick = () => {
+      if (!confirm("Stop syncing on this device? Your paper stays here and in the GitHub repo; this device just stops updating.")) return;
+      Sync.disconnect();
+      renderSettings();
+    };
+  }
 
   function renderFeedList() {
     const disabled = new Set(Store.state.feedPrefs.disabled);
@@ -776,5 +863,17 @@
     });
   }
 
+  // Sync status: a dot on the Settings link, and live updates on the Settings page.
+  Sync.onStatus((st) => {
+    const dot = $("#sync-dot");
+    if (dot) {
+      dot.hidden = st.state === "off";
+      dot.className = `sync-dot ${st.state}`;
+      dot.title = st.state === "error" ? `Sync problem: ${st.message}` : st.state === "syncing" ? "Syncing…" : st.state === "pending" ? "Unsynced changes" : "Synced";
+    }
+    if (document.body.dataset.view === "settings" && !$("#sync-form")) renderSyncPanel();
+  });
+
   route();
+  if (Sync.enabled()) Sync.pullAndRefresh();
 })();

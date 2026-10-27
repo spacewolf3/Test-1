@@ -62,4 +62,18 @@ It opens full-screen with its own icon and works without a connection, though ga
 Most websites don't let a web page read their RSS feed directly. When that happens, the app reads the feed through [rss2json.com](https://rss2json.com), a free service that converts feeds. That service sees which feed addresses are requested, and nothing else.
 
 ## Your data
-Everything is saved in your browser's local storage. Nothing is sent anywhere except the searches made to the public topic and research sources. Use **Settings → Export backup** now and then, and use **Import** to move your paper to another device or browser.
+Everything is saved in your browser's local storage, on that device only. Nothing is sent anywhere except the searches made to the public topic and research sources, unless you turn on sync.
+
+### Syncing across devices
+**Settings → Sync across devices** saves your paper as `paper.json` in a **private** GitHub repo of your own, such as `my-paper-data`. Keep it separate from this app's repo, so your writing stays private even if the app's code is public.
+1. Create a private repo at https://github.com/new.
+2. Create a fine-grained access token at https://github.com/settings/personal-access-tokens/new. Give it access to **only that repo**, with **Contents: Read and write**.
+3. Paste the repo name and token into Settings on each device.
+
+How it behaves:
+- Changes are saved to GitHub about 15 seconds after you stop editing, and when you leave the app. Opening the app pulls in changes from your other devices.
+- If you edit on two devices before they sync, the copies are merged item by item. The newest edit to each article, book or note wins, and deletions stick.
+- Every save is a commit, so the repo's history doubles as a complete backup.
+- The token is stored only on the device where you pasted it. It's never synced or included in backups.
+
+**Settings → Export backup** still saves a copy as a file, and **Import** replaces everything on that device with the backup.

@@ -1,10 +1,10 @@
 /* Lets the app open without a connection. App files are fetched fresh when
    online (so updates show up right away) and served from the cache when offline.
    Requests to other sites (topic sources, covers, fonts) are left alone. */
-const CACHE = "my-paper-v1";
+const CACHE = "my-paper-v2";
 const SHELL = [
   "./", "index.html", "manifest.webmanifest", "css/styles.css",
-  "js/store.js", "js/format.js", "js/evergreen.js", "js/feeds.js", "js/sources.js", "js/books.js", "js/app.js",
+  "js/store.js", "js/format.js", "js/evergreen.js", "js/feeds.js", "js/sources.js", "js/books.js", "js/sync.js", "js/app.js",
   "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png", "icons/favicon-32.png",
 ];
 
