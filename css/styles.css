@@ -297,6 +297,28 @@ label .muted { font-weight: 400; }
 }
 .search-links a:hover { background: var(--ink); color: #fff; }
 
+
+/* newsroom brainstorm + inline article form */
+.brainstorm, .write-inline { border-top: 3px double var(--ink); margin-top: 26px; padding-top: 14px; }
+.section-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.section-head h3 { font: 800 24px var(--serif-display); margin: 0; }
+.brainstorm > .muted, .write.embedded > .muted { margin: 4px 0 12px; font-size: 14px; }
+.q-group { border: 1px solid #e7e4da; border-radius: 10px; padding: 0 14px; margin-bottom: 10px; background: #fcfbf8; }
+.q-group[open] { padding-bottom: 4px; }
+.q-group summary { cursor: pointer; padding: 11px 0; font: 700 12px var(--sans); text-transform: uppercase; letter-spacing: .1em; color: var(--accent); list-style-position: inside; }
+.q-group summary .meta { float: right; text-transform: none; letter-spacing: 0; font-weight: 500; }
+.q-group .prompt textarea, .general-notes textarea { font: 15px/1.5 var(--serif); resize: vertical; background: #fff; overflow: hidden; }
+.general-notes { margin-top: 16px; }
+.general-notes textarea { background: #fffdf3; border-color: #e7dfb8; min-height: 140px; overflow: auto; }
+.write.embedded { max-width: none; padding: 0; margin: 0; }
+.write.embedded .article-form { grid-template-columns: 1fr; gap: 12px; }
+.write.embedded .form-main, .write.embedded .form-side { border: none; padding: 0; background: none; }
+.write.embedded .form-main textarea { min-height: 360px; }
+.write.embedded .form-side { position: static; display: grid; grid-template-columns: 1fr 1fr; column-gap: 14px; }
+.write.embedded .form-side .img-preview, .write.embedded .form-side .sources-pick, .write.embedded .form-buttons { grid-column: 1 / -1; }
+.write.embedded .preview { margin-top: 20px; }
+@media (max-width: 720px) { .write.embedded .form-side { grid-template-columns: 1fr; } }
+
 /* write */
 .write { max-width: 1180px; margin: 0 auto; padding: 22px 16px 60px; }
 .write-head h2 { font: 800 28px var(--serif-display); margin: 6px 0 2px; }

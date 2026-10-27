@@ -22,8 +22,8 @@ A one-person newspaper: find topics, research them, write the stories yourself, 
   - Studies and papers (Europe PMC).
   - Discussions (Hacker News).
   - One-click searches on Google News, AP, Reuters, BBC, NPR, Google Scholar, PubMed, Britannica, Internet Archive and more.
-  - Brainstorm prompts and a notepad that saves as you type.
-- **Submit article**: paste in the piece you wrote elsewhere. Add a headline, subheadline, byline, section, date and an optional image. Pick which sources to list under it, preview it, then publish.
+- **Brainstorm** on the same page: about 18 questions, each with its own answer box. They're grouped into Find the story, The people, The facts and Your take, plus a few suited to the topic's category (for example, study limits for science, or why it still matters for history). There's also a general notes box. Everything saves as you type and syncs with the rest of your paper.
+- **Write your article** at the bottom of the page. Write it there or paste it in from elsewhere. **Pull my brainstorm answers into the draft** drops your answers in as a rough outline to rewrite. Then add a headline, subheadline, byline, section, date and an optional image, pick which sources to list, preview, and publish.
 
 **📚 Bookshelf**
 - Add the books you've read by searching [Open Library](https://openlibrary.org), a free book catalog, or add them by hand.

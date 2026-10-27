@@ -434,5 +434,56 @@
     };
   }
 
-  window.Sources = { gather, research, searchLinks, angles };
+  // ---------------------------------------------------------------------------
+  // Brainstorm questions, each with its own answer box in the Newsroom.
+  // ---------------------------------------------------------------------------
+  const PROMPT_GROUPS = [
+    { group: "Find the story", items: [
+      ["hook", "What's the one-sentence version of this story?", "If you could only tell a friend one thing about it."],
+      ["why_now", "Why does this matter right now?", "Why should a reader care today, and not last year?"],
+      ["surprise", "What surprised you, or seems counterintuitive?", "That's often the best way in."],
+      ["question", "What question will your article answer?", "The thing readers will know by the end."],
+    ] },
+    { group: "The people", items: [
+      ["who", "Who is affected, and how would they describe it?", ""],
+      ["players", "Who are the key players, and what does each want?", ""],
+      ["missing", "Whose perspective is missing from the coverage you've read?", ""],
+      ["scene", "What's a vivid scene, moment or person you could open with?", "Concrete details pull readers in."],
+    ] },
+    { group: "The facts", items: [
+      ["backstory", "What's the backstory a reader needs?", "Keep it to what's necessary to follow along."],
+      ["numbers", "What are the key facts, numbers and dates?", "Note where each came from."],
+      ["unknowns", "What's still unknown, disputed or uncertain?", ""],
+      ["sources", "Which sources do you trust most here, and why?", ""],
+    ] },
+    { group: "Your take", items: [
+      ["take", "What do you think? Where do you land?", ""],
+      ["counter", "What's the strongest argument against your view?", "Steelman it."],
+      ["next", "What happens next, and what should readers watch for?", ""],
+      ["headlines", "Try out a few headlines.", "Write three; the best one is often the third.", true],
+    ] },
+  ];
+  const CATEGORY_PROMPTS = {
+    "Current Events": [["precedent", "Has anything like this happened before? How did it turn out?"], ["local", "How does this reach everyday life, or your own community?"]],
+    "Hot Theme": [["why_everywhere", "Why are so many outlets covering this at once?"], ["compare_coverage", "How do the outlets differ in what they emphasize, and what are they all missing?"]],
+    Trending: [["why_searching", "Why are so many people looking this up right now?"], ["behind", "What's the story behind the headlines?"]],
+    Science: [["research_q", "What question were the researchers asking, and how did they test it?"], ["limits", "How big was the study, and what are its limits?"], ["everyday", "What would this change in everyday life?"]],
+    Tech: [["winners", "Who wins and who loses if this takes off?"], ["explain", "How would you explain it to someone who doesn't follow tech?"]],
+    History: [["still_matters", "Why does this still matter today?"], ["human", "Who is the person at the center of this story?"], ["myths", "What do most people get wrong about it?"]],
+    Ideas: [["big_idea", "What's the big idea, in your own words?"], ["agree", "Do you agree? Where does the idea show up in everyday life?"]],
+    "Design & Art": [["maker", "Who made this, and what were they trying to do?"], ["describe", "Describe it so a reader can picture it without seeing it."]],
+    Surprise: [["curious", "What made you curious about this?"], ["strangest", "What's the strangest detail you found?"]],
+  };
+
+  /** Grouped questions for a topic: the general ones plus a few suited to its category. */
+  function prompts(topic) {
+    const extra = CATEGORY_PROMPTS[topic.category] || [["hook_reader", "What's the hook that makes a reader care today?"], ["image", "What image or detail captures this topic?"]];
+    const groups = [{ group: `For this ${topic.category === "My Topics" ? "idea" : "topic"}`, items: extra }, ...PROMPT_GROUPS];
+    return groups.map((g) => ({
+      group: g.group,
+      items: g.items.map(([id, q, hint = "", short = false]) => ({ id, q, hint, short })),
+    }));
+  }
+
+  window.Sources = { gather, research, searchLinks, angles, prompts };
 })();

@@ -411,7 +411,7 @@
         <h2>${esc(t.title)}</h2>
         ${t.blurb ? `<p class="lede">${esc(t.blurb)}</p>` : ""}
         <div class="detail-actions">
-          <a class="btn primary" href="#/write/${encodeURIComponent(t.id)}">✎ Submit article</a>
+          <button class="btn primary" data-act="jump-write">✎ Write article ↓</button>
           <button class="btn" data-act="desk">${t.status === "desk" ? "★ On your desk" : "☆ Save to desk"}</button>
           <button class="btn" data-act="refresh">↻ Refresh research</button>
           <button class="btn ghost" data-act="dismiss">Dismiss</button>
@@ -440,6 +440,8 @@
     const r = t.research;
     const s = r.summary;
     const notes = Store.state.notes[t.id] || "";
+    const prompts = Sources.prompts(t);
+    const answers = { ...(Store.state.topicAnswers[t.id] || {}) };
     el.innerHTML = header + `
       <div class="research">
         <div class="r-block original">
@@ -465,13 +467,6 @@
           </div>
         </div>` : ""}
 
-        <div class="r-block brainstorm">
-          <h4>Brainstorm</h4>
-          <ul class="angles">${r.angles.map((q) => `<li>${esc(q)}</li>`).join("")}</ul>
-          <textarea id="notes" placeholder="Jot down angles, questions, quotes, an outline…">${esc(notes)}</textarea>
-          <div class="meta" id="notes-status">Notes save automatically.</div>
-        </div>
-
         <div class="r-grid">
           <div class="r-block"><h4>Recent coverage</h4>${linkList(r.coverage, "No recent coverage found — try the searches below.")}</div>
           <div class="r-block"><h4>Related reading</h4>${linkList(r.related.filter((x) => !s || x.title !== s.title), "No related articles found.")}</div>
@@ -485,16 +480,71 @@
           <div class="search-links">${r.searchLinks.map((l) => `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a>`).join("")}</div>
         </div>
         <p class="meta">Research gathered ${esc(new Date(r.fetchedAt).toLocaleString())}.</p>
-      </div>`;
+      </div>
+
+      <section class="brainstorm" id="brainstorm">
+        <div class="section-head">
+          <h3>Brainstorm</h3>
+          <span class="meta" id="answer-count"></span>
+        </div>
+        <p class="muted">Answer whichever questions spark something. Rough notes are fine, and everything saves as you type.</p>
+        ${prompts.map((g) => `
+          <details class="q-group" open>
+            <summary>${esc(g.group)} <span class="meta">${g.items.filter((p) => (answers[p.id] || "").trim()).length}/${g.items.length}</span></summary>
+            ${g.items.map((p) => `
+              <label class="prompt">
+                <span class="q">${esc(p.q)}</span>
+                ${p.hint ? `<span class="hint">${esc(p.hint)}</span>` : ""}
+                <textarea data-q="${esc(p.id)}" rows="2">${esc(answers[p.id] || "")}</textarea>
+              </label>`).join("")}
+          </details>`).join("")}
+        <label class="prompt general-notes">
+          <span class="q">General notes</span>
+          <span class="hint">Anything else: quotes, links, an outline, loose thoughts.</span>
+          <textarea id="notes" rows="6">${esc(notes)}</textarea>
+        </label>
+        <div class="meta" id="notes-status">Notes save automatically.</div>
+      </section>
+
+      <section class="write-inline" id="write-section"></section>`;
     wireDetail(t);
 
+    // Notes and answers: save shortly after typing stops, and right away when leaving a box.
     const ta = $("#notes");
-    let timer;
-    ta.oninput = () => {
+    const boxes = $$("textarea[data-q]", el);
+    let timer = null;
+    const saveNotes = () => {
       clearTimeout(timer);
-      $("#notes-status").textContent = "Saving…";
-      timer = setTimeout(() => { Store.setNotes(t.id, ta.value); $("#notes-status").textContent = "Saved."; }, 400);
+      timer = null;
+      boxes.forEach((b) => { answers[b.dataset.q] = b.value; });
+      Object.keys(answers).forEach((k) => { if (!answers[k].trim()) delete answers[k]; });
+      Store.setAnswers(t.id, { ...answers });
+      Store.setNotes(t.id, ta.value);
+      $("#notes-status").textContent = "Saved.";
+      updateAnswerCount();
     };
+    const updateAnswerCount = () => {
+      const all = prompts.flatMap((g) => g.items);
+      $("#answer-count").textContent = `${all.filter((p) => (answers[p.id] || "").trim()).length} of ${all.length} answered`;
+      $$(".q-group", el).forEach((d, i) => {
+        $("summary .meta", d).textContent = `${prompts[i].items.filter((p) => (answers[p.id] || "").trim()).length}/${prompts[i].items.length}`;
+      });
+    };
+    updateAnswerCount();
+    const grow = (b) => { b.style.height = "auto"; b.style.height = Math.max(b.scrollHeight + 2, 54) + "px"; };
+    [...boxes, ta].forEach((b) => {
+      if (b !== ta) grow(b);
+      b.oninput = () => {
+        if (b !== ta) grow(b);
+        clearTimeout(timer);
+        $("#notes-status").textContent = "Saving…";
+        timer = setTimeout(saveNotes, 400);
+      };
+      b.onchange = () => { if (timer) saveNotes(); };
+    });
+
+    // The article form lives at the bottom of the same page.
+    renderWrite({ topicId: t.id, mount: $("#write-section"), notesFor: t });
     $("#requery").onsubmit = (e) => {
       e.preventDefault();
       const q = e.target.q.value.trim();
@@ -513,11 +563,15 @@
       renderNewsroom(t.id);
     };
     $("[data-act=refresh]", el).onclick = () => renderTopicDetail(t.id, { refresh: true });
+    $("[data-act=jump-write]", el).onclick = () => {
+      const w = $("#write-section");
+      if (w) w.scrollIntoView({ behavior: "smooth" });
+    };
     $("[data-act=dismiss]", el).onclick = () => dismiss(t.id, t.id);
   }
 
   // ---------------------------------------------------------------- write / edit
-  function renderWrite({ topicId, articleId, bookId }) {
+  function renderWrite({ topicId, articleId, bookId, mount, notesFor }) {
     const book = bookId ? Store.book(bookId) : null;
     if (bookId && !book) return go("#/books");
     // Rebuilding a review that's already published edits that article rather than adding a second one.
@@ -565,15 +619,20 @@
     const allSources = [...(v.sources || []), ...suggestedSources.filter((x) => !chosen.has(x.url))];
     const sectionOpts = SECTIONS.includes(v.section) ? SECTIONS : [...SECTIONS, v.section];
 
-    app.innerHTML = `
-      <div class="write">
+    const target = mount || app;
+    target.innerHTML = `
+      <div class="write ${mount ? "embedded" : ""}">
+        ${mount ? `
+        <div class="section-head"><h3>Write your article</h3></div>
+        <p class="muted">Write here, or write somewhere else and paste it in. Your draft saves as you go.
+          <button type="button" class="linklike" id="pull-notes">Pull my brainstorm answers into the draft</button></p>` : `
         <div class="write-head">
           <a class="back" href="${book ? `#/books/${book.id}` : editing ? `#/paper/article/${editing.id}` : topic ? `#/newsroom/${encodeURIComponent(topic.id)}` : "#/newsroom"}">← Back</a>
           <h2>${book ? (editing ? "Update your review" : "Your review") : editing ? "Edit article" : "Submit your article"}</h2>
           ${topic ? `<p class="muted">Topic: ${esc(topic.title)}</p>` : ""}
           ${book ? `<p class="muted">Built from your notes on <em>${esc(book.title)}</em>. Polish it here: reorder, add transitions, cut what doesn't fit. Then publish.</p>` : ""}
           ${book && editing ? `<p class="warn">This draft was rebuilt from your notes. Saving replaces the text of your published review. Go back to keep the published version as it is.</p>` : ""}
-        </div>
+        </div>`}
         <form id="article-form" class="article-form">
           <div class="form-main">
             <label>Headline<input name="headline" required value="${esc(v.headline)}" class="input-headline"></label>
@@ -609,6 +668,15 @@
       </div>`;
 
     const form = $("#article-form");
+    const pull = $("#pull-notes");
+    if (pull && notesFor) pull.onclick = () => {
+      const outline = notesOutline(notesFor);
+      if (!outline) return toast("Answer a few brainstorm questions first.");
+      form.body.value = form.body.value.trim() ? `${form.body.value.trim()}\n\n---\n\n${outline}` : outline;
+      form.body.dispatchEvent(new Event("input", { bubbles: true }));
+      form.body.focus();
+      toast("Added your answers to the draft. Rewrite them into your own flow.");
+    };
     const read = () => {
       const fd = new FormData(form);
       return {
@@ -663,6 +731,19 @@
       toast(editing ? "Changes saved." : "Published! Your story is in the paper.");
       go(`#/paper/article/${id}`);
     };
+  }
+
+  /** A topic's brainstorm answers and notes as a rough outline: one subheading per group. */
+  function notesOutline(t) {
+    const answers = Store.state.topicAnswers[t.id] || {};
+    const parts = [];
+    for (const g of Sources.prompts(t)) {
+      const filled = g.items.filter((p) => p.id !== "headlines" && (answers[p.id] || "").trim());
+      if (filled.length) parts.push(`## ${g.group}`, ...filled.map((p) => answers[p.id].trim()));
+    }
+    const notes = (Store.state.notes[t.id] || "").trim();
+    if (notes) parts.push("## Notes", notes);
+    return parts.join("\n\n");
   }
 
   // ---------------------------------------------------------------- settings

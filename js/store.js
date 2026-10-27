@@ -17,6 +17,7 @@
     topics: [],   // {id, title, kicker, blurb, category, source, sourceUrl, wikiTitle, query, addedAt, status: 'new'|'desk', research?}
     seen: [],     // ids ever added or dismissed, so gathers don't repeat them
     notes: {},    // topicId -> brainstorm text
+    topicAnswers: {}, // topicId -> {promptId: answer}
     drafts: {},   // topicId -> unpublished article form contents
     feedPrefs: { disabled: [], custom: [] }, // feed URLs turned off, and feeds you added
     books: [],    // {id, title, author, year, pages, cover, olUrl, kind, status, dateFinished, rating, answers, reviewId}
@@ -27,7 +28,7 @@
 
   // What gets tracked for merging: lists of items with ids, maps keyed by id, and whole objects.
   const LISTS = { topics: "topic", articles: "article", books: "book" };
-  const MAPS = { notes: "note", drafts: "draft" };
+  const MAPS = { notes: "note", drafts: "draft", topicAnswers: "answers" };
   const OBJECTS = ["settings", "feedPrefs"];
 
   /** Every tracked item in a state, as "kind:id" -> JSON text. */
@@ -132,6 +133,7 @@
       state.topics = state.topics.filter((t) => t.id !== id);
       delete state.notes[id];
       delete state.drafts[id];
+      delete state.topicAnswers[id];
       save();
     },
     setTopicStatus(id, status) {
@@ -143,6 +145,7 @@
       if (t) { t.research = research; save(); }
     },
     setNotes(id, text) { state.notes[id] = text; save(); },
+    setAnswers(id, answers) { state.topicAnswers[id] = answers; save(); },
     setDraft(id, draft) { state.drafts[id] = draft; save(); },
 
     // ---- books ----
